@@ -8,6 +8,7 @@ class MainWindow;
 }
 class QSerialPort;
 class QFileSystemWatcher;
+class Wiener;
 
 class MainWindow : public QMainWindow
 {
@@ -19,11 +20,15 @@ public:
 
 private Q_SLOTS:
     void handleShiftButton();
-    void handleRelayButton();
+    void handleSnapshotButton();
+    void handleAutoButton();
 
     void handleDirectoryChanged(const QString &path);
 
 private:
+    void shift(int hor, int ver);
+    void snapshot();
+
     void readSettings();
     void connectToDevice();
     QStringList freshPics(const QString &path);
@@ -33,6 +38,7 @@ private:
     QFileSystemWatcher *watcher;
 
     QStringList pics;
+    Wiener *wiener;
 
     QString comPort;
     QString picsDirPath;
