@@ -26,6 +26,8 @@ private:
 
     int curHorShift;
     int curVerShift;
+
+    void process();
 };
 
 #endif // WIENER_H
