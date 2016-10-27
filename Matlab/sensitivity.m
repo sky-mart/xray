@@ -1,4 +1,4 @@
-im_num = 24;
+im_num = 22;
 height = 790;
 width = 524;
 

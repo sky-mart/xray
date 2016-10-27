@@ -119,10 +119,10 @@ attenuation_coeff_al(:,1) = attenuation_coeff_al(:,1) * 1e3; % to keV
 %plot(attenuation_coeff_al(:,1), attenuation_coeff_al(:,2))
 %plot(emission_spectrum(:,1), emission_spectrum(:,2))
 
-d = 5e-4; % cm
-I_total = sum(emission_spectrum(1:8,2));
+d = 0.462; % cm
+I_total = sum(emission_spectrum(:,2));
 I_dim = 0;
-for i = 1:8%size(emission_spectrum, 1)
+for i = 1:size(emission_spectrum, 1)
     energy = emission_spectrum(i,1);
     for j = 1:size(attenuation_coeff_al, 1)-1
         a = attenuation_coeff_al(j,1);
