@@ -17,9 +17,12 @@ public:
     QPair<int, int> curShift();
     void addCurSample(const Mat & sample);
 
+    void process();
+
 private:
     int psfSize;
     QVector<QVector<Mat> > samples;
+    Mat conv;
 
     int curX;
     int curY;
@@ -27,7 +30,9 @@ private:
     int curHorShift;
     int curVerShift;
 
-    void process();
+    void setPsfSize(int psfSize);
+    void readSamples(const QString &path, const QString &baseName);
+    void convFromSamples();
 };
 
 #endif // WIENER_H

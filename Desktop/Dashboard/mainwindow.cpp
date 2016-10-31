@@ -113,14 +113,16 @@ QStringList MainWindow::freshPics(const QString &path)
 
 void MainWindow::handleAutoButton()
 {
-    QPair<int, int> cur = wiener->curShift();
-    if (cur.first == 0 && cur.second == 0) {
-        qDebug() << "finished" << endl;
-        return;
-    }
-    qDebug() << "shift " << cur.first << ' ' << cur.second << endl;
-    shift(cur.first, cur.second);
-    snapshot();
+//    QPair<int, int> cur = wiener->curShift();
+//    if (cur.first == 0 && cur.second == 0) {
+//        qDebug() << "finished" << endl;
+//        return;
+//    }
+//    qDebug() << "shift " << cur.first << ' ' << cur.second << endl;
+//    shift(cur.first, cur.second);
+//    snapshot();
+    wiener->process();
+
 }
 
 void MainWindow::shift(int hor, int ver)
