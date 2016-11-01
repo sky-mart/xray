@@ -5,7 +5,7 @@
 #include <QVector>
 #include "opencv2/core/core.hpp"
 
-using cv::Mat;
+using namespace cv;
 
 class Wiener : public QObject
 {
@@ -18,11 +18,14 @@ public:
     void addCurSample(const Mat & sample);
 
     void process();
+    static int gcd(int a, int b);
 
 private:
     int psfSize;
     QVector<QVector<Mat> > samples;
     Mat conv;
+    Mat psf;
+    Mat rest;
 
     int curX;
     int curY;
@@ -33,6 +36,9 @@ private:
     void setPsfSize(int psfSize);
     void readSamples(const QString &path, const QString &baseName);
     void convFromSamples();
+    void deconv(const Mat & c, const Mat & b, float snr, Mat &a);
+    Size adjsize(const Size & N, const Size & K);
+    void printMat(const Mat & M);
 };
 
 #endif // WIENER_H

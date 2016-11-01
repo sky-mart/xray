@@ -3,11 +3,9 @@
 #include <QDebug>
 #include <QDir>
 #include "opencv2/highgui.hpp"
+#include "opencv2/imgproc.hpp"
+#include <iostream>
 
-//using cv::imread;
-//using cv::imwrite;
-//using cv::Point;
-//using cv::Size;
 using namespace cv;
 
 Wiener::Wiener(int psfSize, QObject *parent) : QObject(parent)
@@ -71,6 +69,10 @@ void Wiener::process()
     readSamples(tr("."), tr("peka"));
     convFromSamples();
     imwrite("conv_peka.png", conv);
+    Mat rest;
+    Mat psf = Mat::ones(psfSize, psfSize, CV_32F) / (psfSize*psfSize);
+    deconv(conv, psf, 100, rest);
+    imwrite("rest_peka.png", rest);
 }
 
 void Wiener::readSamples(const QString & path, const QString & baseName)
@@ -94,8 +96,7 @@ void Wiener::readSamples(const QString & path, const QString & baseName)
 
         QString fullPath = path + QDir::separator() + sampleName;
         Mat tmp = imread(fullPath.toStdString(), CV_LOAD_IMAGE_GRAYSCALE);
-        tmp.convertTo(samples[ay][ax], CV_32FC1);
-        qDebug() << samples[ay][ax].type() << endl;
+        tmp.convertTo(samples[ay][ax], CV_32F);
     }
 }
 
@@ -111,4 +112,76 @@ void Wiener::convFromSamples()
                     int j = (x - anchor_x) / psfSize;
                     conv.at<float>(y, x) = samples[anchor_y][anchor_x].at<float>(i, j);
                 }
+}
+
+void Wiener::deconv(const Mat &c, const Mat &b, float snr, Mat & a)
+{
+    int outRows = c.rows - b.rows + 1;
+    int outCols = c.cols - b.cols + 1;
+    Size padSize = adjsize(c.size(), b.size());
+
+    Mat cPadded, bPadded;
+    copyMakeBorder(c, cPadded, 0, padSize.height - c.rows,
+                   0, padSize.width - c.cols, BORDER_CONSTANT, Scalar::all(0));
+    copyMakeBorder(b, bPadded, 0, padSize.height - b.rows,
+                   0, padSize.width - b.cols, BORDER_CONSTANT, Scalar::all(0));
+
+    printMat(cPadded);
+    std::cout << endl;
+    printMat(bPadded);
+
+    Mat planes[2] = {Mat_<float>(cPadded), Mat::zeros(padSize, CV_32F)};
+
+    Mat Fc, Fb;
+    merge(planes, 2, Fc);
+    dft(Fc, Fc); // Fc has spectre of c now
+
+    planes[0] = Mat_<float>(bPadded);
+    merge(planes, 2, Fb);
+    dft(Fb, Fb); // Fb has spectre of b now
+
+
+//    split(Fb, planes);
+//    Mat bMag;
+//    magnitude(planes[0], planes[1], bMag);
+//    planes[0] = Mat_<float>(bMag);
+//    planes[1] = Mat::zeros(bMag.size(), CV_32F);
+//    merge(planes, 2, bMag); // bMag - complex number
+
+//    Mat G = bMag / (bMag + 1.0 / snr) / Fb;
+//    idft(G * Fc, a);
+    idft(Fc / Fb, a);
+    split(a, planes);
+    a = planes[0](Range(0, outRows), Range(0, outCols)); // real part of necessary size
+}
+
+Size Wiener::adjsize(const Size & N0, const Size & K)
+{
+    Size N = N0;
+    while (gcd(N.width, K.width) != 1)
+        N = Size(N.width + 1, N.height);
+    while (gcd(N.height, K.height) != 1)
+        N = Size(N.width, N.height + 1);
+    return N;
+}
+
+int Wiener::gcd(int a, int b)
+{
+    while (a != 0 && b != 0) {
+        if (a > b)
+            a = a % b;
+        else
+            b = b % a;
+    }
+    return a + b;
+}
+
+void Wiener::printMat(const Mat & M)
+{
+    for (int i = 0; i < M.rows; i++) {
+        for (int j = 0; j < M.cols; j++) {
+            std::cout << M.at<float>(i, j) << ' ';
+        }
+        std::cout << std::endl;
+    }
 }
