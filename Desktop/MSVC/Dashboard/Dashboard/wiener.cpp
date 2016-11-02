@@ -43,7 +43,7 @@ QPair<int, int> Wiener::curShift()
 void Wiener::addCurSample(const Mat & sample)
 {
 	qDebug() << "added sample (" << anchorY << ", " << anchorX << ")" << endl;
-    sample.convertTo(samples[anchorY][anchorX], CV_32F);
+    sample.convertTo(samples[anchorY][anchorX], CV_64F);
 
     anchorX++;
     if (anchorX == psfSize) {
@@ -68,20 +68,23 @@ void Wiener::addCurSample(const Mat & sample)
 	}
 }
 
-void Wiener::process()
+void Wiener::process(bool test)
 {
-	//readSamples(tr("D:\\Vlad\\Projects\\xray\\images"), tr("peka"));
+	if (test) {
+		readSamples(testDirPath, testName);
+	}
+	
 	convFromSamples();
-	//imwrite("D:\\Vlad\\Projects\\xray\\images\\conv_peka.png", conv);
+	imwrite((testDirPath + QDir::separator() + "conv_" + testName + ".png").toStdString(), conv);
 	Mat rest;
-	Mat psf = Mat::ones(psfSize, psfSize, CV_32F) / (psfSize*psfSize);
+	Mat psf = Mat::ones(psfSize, psfSize, CV_64F) / (psfSize*psfSize);
 
-	float sigma = 0.1;
+	double sigma = 0.01;
 	Mat withoutBorders = conv(Range(psfSize, conv.rows - psfSize), Range(psfSize, conv.cols - psfSize));
-	float snr = mean(withoutBorders)[0] / sigma;
+	double snr = mean(withoutBorders)[0] / sigma;
 
 	deconv(conv, psf, snr, rest);
-	imwrite("D:\\Vlad\\Projects\\xray\\images\\rest_peka.png", rest);
+	imwrite((testDirPath + QDir::separator() + "rest_" + testName + ".png").toStdString(), rest);
 }
 
 void Wiener::readSamples(const QString & path, const QString & baseName)
@@ -105,13 +108,13 @@ void Wiener::readSamples(const QString & path, const QString & baseName)
 
 		QString fullPath = path + QDir::separator() + sampleName;
 		Mat tmp = imread(fullPath.toStdString(), CV_LOAD_IMAGE_GRAYSCALE);
-		tmp.convertTo(samples[ay][ax], CV_32F);
+		tmp.convertTo(samples[ay][ax], CV_64F);
 	}
 }
 
 void Wiener::convFromSamples()
 {
-	conv = Mat(psfSize * samples[0][0].rows, psfSize * samples[0][0].cols, CV_32FC1);
+	conv = Mat(psfSize * samples[0][0].rows, psfSize * samples[0][0].cols, CV_64F);
 
 	for (int anchor_y = 0; anchor_y < psfSize; anchor_y++)
 		for (int anchor_x = 0; anchor_x < psfSize; anchor_x++)
@@ -119,11 +122,11 @@ void Wiener::convFromSamples()
 				for (int x = anchor_x; x < conv.cols; x += psfSize) {
 					int i = (y - anchor_y) / psfSize;
 					int j = (x - anchor_x) / psfSize;
-					conv.at<float>(y, x) = samples[anchor_y][anchor_x].at<float>(i, j);
+					conv.at<double>(y, x) = samples[anchor_y][anchor_x].at<double>(i, j);
 				}
 }
 
-void Wiener::deconv(const Mat &c, const Mat &b, float snr, Mat & a)
+void Wiener::deconv(const Mat &c, const Mat &b, double snr, Mat & a)
 /*
 	Wiener Deconvolution of 2D signals.
 	Assumed that c(t) = (a * b)(t) + n(t), where n(t) is noise.
@@ -142,30 +145,44 @@ void Wiener::deconv(const Mat &c, const Mat &b, float snr, Mat & a)
 	copyMakeBorder(b, bPadded, 0, padSize.height - b.rows,
 		0, padSize.width - b.cols, BORDER_CONSTANT, Scalar::all(0));
 
+
 	// Fc = dft(c), Fb = dft(b)
-	Mat planes[2] = { Mat_<float>(cPadded), Mat::zeros(padSize, CV_32F) };
+	Mat planes[2] = { Mat_<double>(cPadded), Mat::zeros(padSize, CV_64F) };
 	Mat Fc, Fb;
 	merge(planes, 2, Fc);
 	dft(Fc, Fc); // Fc has spectre of c now
-	planes[0] = Mat_<float>(bPadded);
+	planes[0] = Mat_<double>(bPadded);
 	merge(planes, 2, Fb);
 	dft(Fb, Fb); // Fb has spectre of b now
 
 	// magnitudes of b for future calculations 
 	split(Fb, planes);
-	Mat bMag;
+	Mat bMag, bMag2;
 	magnitude(planes[0], planes[1], bMag);
+	bMag2 = bMag.mul(bMag);
 
 	// a = idft(G * Fc), multiplication here, not convolution
 	// G = Fb*Fb' / (Fb*Fb' + 1.0 / snr) / Fb
-	Mat tmp = bMag / (bMag + 1.0 / snr);
-	planes[0] = Mat_<float>(tmp);
-	planes[1] = Mat::zeros(tmp.size(), CV_32F);
+	//qDebug() << "numerator";
+	//printMat(bMag2);
+	//qDebug() << "denominator";
+	//printMat(bMag2 + 1.0 / snr);
+	Mat tmp = bMag2 / (bMag2 + 1.0 / snr);
+	//qDebug() << "Fb*Fb' / (Fb*Fb' + 1.0 / snr)";
+	//printMat(tmp);
+	planes[0] = Mat_<double>(tmp);
+	planes[1] = Mat::zeros(tmp.size(), CV_64F);
 	merge(planes, 2, tmp); // tmp - complex number
 	Mat G;
 	complexMatDiv(tmp, Fb, G);
+	//qDebug() << "G";
+	//printMat(G);
 	complexMatMul(G, Fc, tmp);
+	//qDebug() << "G*Fc";
+	//printMat(tmp);
 	idft(tmp, a, DFT_SCALE);
+	//qDebug() << "a";
+	//printMat(a);
 	
 	// deconvolution without noise
 	/*Mat x;
@@ -201,46 +218,66 @@ int Wiener::gcd(int a, int b)
 void Wiener::printMat(const Mat & M)
 {
 	QDebug dbg = qDebug();
-	for (int i = 0; i < M.rows; i++) {
-		for (int j = 0; j < M.cols; j++) {
+	for (int i = 0; i < M.rows / 10; i++) {
+		for (int j = 0; j < M.cols / 10; j++) {
 			if (M.channels() == 1) {
-				dbg << M.at<float>(i, j) << ' ';
+				dbg << M.at<double>(i, j) << ' ';
 			} 
             else if (M.channels() == 2) {
-				Vec2f el = M.at<Vec2f>(i, j);
+				Vec2d el = M.at<Vec2d>(i, j);
 				dbg << el[0] << "+" << el[1] << 'i';
 			}	
 		}
-		dbg << '\n';
+		dbg << endl;
 	}
 }
 
 void Wiener::complexMatMul(const Mat & a, const Mat & b, Mat & c)
 {
-	c = Mat(a.rows, a.cols, CV_32FC2);
+	c = Mat(a.rows, a.cols, CV_64FC2);
 	for (int i = 0; i < a.rows; i++) {
 		for (int j = 0; j < a.cols; j++) {
-			Vec2f avec = a.at<Vec2f>(i, j);
-			Vec2f bvec = b.at<Vec2f>(i, j);
-			std::complex<float> ac(avec[0], avec[1]);
-			std::complex<float> bc(bvec[0], bvec[1]);
-			std::complex<float> cc = ac * bc;
-			c.at<Vec2f>(i, j) = Vec2f(cc.real(), cc.imag());
+			Vec2d avec = a.at<Vec2d>(i, j);
+			Vec2d bvec = b.at<Vec2d>(i, j);
+			std::complex<double> ac(avec[0], avec[1]);
+			std::complex<double> bc(bvec[0], bvec[1]);
+			std::complex<double> cc = ac * bc;
+			c.at<Vec2d>(i, j) = Vec2d(cc.real(), cc.imag());
 		}
 	}
 }
 
 void Wiener::complexMatDiv(const Mat & a, const Mat & b, Mat & c)
 {
-	c = Mat(a.rows, a.cols, CV_32FC2);
+	c = Mat(a.rows, a.cols, CV_64FC2);
 	for (int i = 0; i < a.rows; i++) {
 		for (int j = 0; j < a.cols; j++) {
-			Vec2f avec = a.at<Vec2f>(i, j);
-			Vec2f bvec = b.at<Vec2f>(i, j);
-			std::complex<float> ac(avec[0], avec[1]);
-			std::complex<float> bc(bvec[0], bvec[1]);
-			std::complex<float> cc = ac / bc;
-			c.at<Vec2f>(i, j) = Vec2f(cc.real(), cc.imag());
+			Vec2d avec = a.at<Vec2d>(i, j);
+			Vec2d bvec = b.at<Vec2d>(i, j);
+			std::complex<double> ac(avec[0], avec[1]);
+			std::complex<double> bc(bvec[0], bvec[1]);
+			std::complex<double> cc = ac / bc;
+			c.at<Vec2d>(i, j) = Vec2d(cc.real(), cc.imag());
 		}
 	}
+}
+
+void Wiener::setTestDirPath(const QString & dirPath)
+{
+	this->testDirPath = dirPath;
+}
+
+const QString & Wiener::getTestDirPath() const
+{
+	return testDirPath;
+}
+
+void Wiener::setTestName(const QString & name)
+{
+	this->testName = name;
+}
+
+const QString &  Wiener::getTestName() const
+{
+	return testName;
 }

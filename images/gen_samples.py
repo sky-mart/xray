@@ -4,6 +4,18 @@ import os
 from scipy.misc import imread
 from PIL import Image
 
+def cut_for_sampling(img, k):
+    cut = img
+    if img.shape[0] % k == 0:
+        cut = img[:-(k - 1),:]
+    elif img.shape[0] % k != 1:
+        cut = img[:-((img.shape[0] % k) - 1),:]
+    if cut.shape[1] % k == 0:
+        cut = cut[:,:-(k - 1)]
+    elif cut.shape[1] % k != 1:
+        cut = cut[:,:-((img.shape[1] % k) - 1)]
+    return cut
+
 def generate_samples(img, psf):
     k = psf.shape[0]; # assume psf as square template
     
@@ -40,27 +52,29 @@ def save_samples(samples, dirpath, base_name, extension=".png"):
 
 def usage():
     print "Usage:"
-    print sys.argv[0] , "image", "psf_size"
+    print sys.argv[0] , "image", "psf_size", "noise_std"
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 4:
         usage()
     else:
         try:
             img_path = sys.argv[1]
             k = int(sys.argv[2])
+            noise_std = float(sys.argv[3])
 
             img = imread(img_path, flatten=True)
             psf = np.ones((k, k)) / k**2
 
             print "Original shape:", img.shape
-            if img.shape[0] % k != 1:
-                img = img[:-((img.shape[0] % k) - 1),:]
-            if img.shape[1] % k != 1:
-                img = img[:,:-((img.shape[1] % k) - 1)]
+            img = cut_for_sampling(img, k)
             print "Shape used for sampling:", img.shape
 
             samples = generate_samples(img, psf)
+
+            for i in xrange(samples.shape[0]):
+                for j in xrange(samples.shape[1]):
+                    samples[i][j] += np.random.normal(0, noise_std, samples[i][j].shape)
 
             dirpath = os.path.dirname(img_path)
             base_name_with_ext = os.path.basename(img_path)       

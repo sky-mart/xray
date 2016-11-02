@@ -22,6 +22,9 @@ public:
 	void handleShiftButton();
 	void handleSnapshotButton();
 	void handleAutoButton();
+	void handleTestButton();
+	void handleTestBaseNameButton();
+	void handleTestDirButton();
 
 	void handleDirectoryChanged(const QString &path);
 
@@ -30,6 +33,7 @@ private:
 	void snapshot();
 
 	void readSettings();
+	void saveSettings();
 	void connectToDevice();
 	QStringList freshPics(const QString &path);
 

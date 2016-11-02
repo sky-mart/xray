@@ -5,6 +5,7 @@
 #include <QFileSystemWatcher>
 #include <QDir>
 #include <QSettings>
+#include <qfiledialog.h>
 
 #include "opencv2/core/core.hpp"
 #include "opencv2/highgui/highgui.hpp"
@@ -23,6 +24,11 @@ ui(new Ui::MainWindow)
 	connect(ui->shiftButton, SIGNAL(pressed()), SLOT(handleShiftButton()));
 	connect(ui->snapshotButton, SIGNAL(pressed()), SLOT(handleSnapshotButton()));
 	connect(ui->autoButton, SIGNAL(pressed()), SLOT(handleAutoButton()));
+	connect(ui->testButton, SIGNAL(pressed()), SLOT(handleTestButton()));
+	connect(ui->testDirButton, SIGNAL(pressed()), SLOT(handleTestDirButton()));
+	connect(ui->testBaseNameButton, SIGNAL(pressed()), SLOT(handleTestBaseNameButton()));
+
+	wiener = new Wiener(3);
 
 	readSettings();
 
@@ -35,11 +41,12 @@ ui(new Ui::MainWindow)
 	serial = NULL;
 	connectToDevice();
 
-	wiener = new Wiener(3);
+	
 }
 
 MainWindow::~MainWindow()
 {
+	saveSettings();
 	if (serial) {
 		serial->close();
 		delete serial;
@@ -55,6 +62,24 @@ void MainWindow::readSettings()
 	picsDirPath = settings->value("pics-dir-path").toString();
 	qDebug() << picsDirPath << endl;
 	comPort = settings->value("com-port").toString();
+
+	QString testDirPath = settings->value("test-dir-path").toString();
+	QString testBaseName = settings->value("test-base-name").toString();
+	qDebug() << "testdir" << testDirPath << endl
+		<< "testname" << testBaseName << endl;
+	ui->testDirLine->setText(testDirPath);
+	ui->testBaseNameLine->setText(testBaseName);
+	wiener->setTestDirPath(testDirPath);
+	wiener->setTestName(testBaseName);
+
+	delete settings;
+}
+
+void MainWindow::saveSettings()
+{
+	QSettings *settings = new QSettings("Dashboard.ini", QSettings::IniFormat);
+	settings->setValue("test-dir-path", QVariant(wiener->getTestDirPath()));
+	settings->setValue("test-base-name", QVariant(wiener->getTestName()));
 	delete settings;
 }
 
@@ -119,11 +144,14 @@ void MainWindow::handleAutoButton()
 	    qDebug() << "finished" << endl;
 	    return;
 	}
-	qDebug() << "shift " << cur.first << ' ' << cur.second << endl;
+	qDebug() << "shift(x,y) " << cur.first << ' ' << cur.second << endl;
 	shift(cur.first, cur.second);
 	snapshot();
-	//wiener->process();
+}
 
+void MainWindow::handleTestButton()
+{
+	wiener->process(true);
 }
 
 void MainWindow::shift(int hor, int ver)
@@ -137,4 +165,19 @@ void MainWindow::shift(int hor, int ver)
 void MainWindow::snapshot()
 {
 	serial->write("r\n");
+}
+
+void MainWindow::handleTestBaseNameButton()
+{
+	wiener->setTestName(ui->testBaseNameLine->text());
+}
+
+void MainWindow::handleTestDirButton()
+{
+	QString dir = QFileDialog::getExistingDirectory(this, tr("Open Directory"),
+		".",
+		QFileDialog::ShowDirsOnly
+		| QFileDialog::DontResolveSymlinks);
+	ui->testDirLine->setText(dir);
+	wiener->setTestDirPath(dir);
 }
