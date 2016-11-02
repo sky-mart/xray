@@ -76,7 +76,7 @@ void Wiener::process()
 
 	float sigma = 0.1;
 	Mat withoutBorders = conv(Range(psfSize, conv.rows - psfSize), Range(psfSize, conv.cols - psfSize));
-	float snr = mean(withoutBorders)[0] /sigma;
+	float snr = mean(withoutBorders)[0] / sigma;
 
 	deconv(conv, psf, snr, rest);
 	imwrite("D:\\Vlad\\Projects\\xray\\images\\rest_peka.png", rest);
@@ -122,31 +122,40 @@ void Wiener::convFromSamples()
 }
 
 void Wiener::deconv(const Mat &c, const Mat &b, float snr, Mat & a)
+/*
+	Wiener Deconvolution of 2D signals.
+	Assumed that c(t) = (a * b)(t) + n(t), where n(t) is noise.
+	Function calculates a(t), knowing signal-to-noise ratio.
+*/
 {
+	// size of a
 	int outRows = c.rows - b.rows + 1;
 	int outCols = c.cols - b.cols + 1;
-	Size padSize = adjsize(c.size(), b.size());
 
+	// to avoid zeros in dft(b) we have to adjust sizes of both c and b
+	Size padSize = adjsize(c.size(), b.size());
 	Mat cPadded, bPadded;
 	copyMakeBorder(c, cPadded, 0, padSize.height - c.rows,
 		0, padSize.width - c.cols, BORDER_CONSTANT, Scalar::all(0));
 	copyMakeBorder(b, bPadded, 0, padSize.height - b.rows,
 		0, padSize.width - b.cols, BORDER_CONSTANT, Scalar::all(0));
 
+	// Fc = dft(c), Fb = dft(b)
 	Mat planes[2] = { Mat_<float>(cPadded), Mat::zeros(padSize, CV_32F) };
-
 	Mat Fc, Fb;
 	merge(planes, 2, Fc);
 	dft(Fc, Fc); // Fc has spectre of c now
-
 	planes[0] = Mat_<float>(bPadded);
 	merge(planes, 2, Fb);
 	dft(Fb, Fb); // Fb has spectre of b now
 
+	// magnitudes of b for future calculations 
 	split(Fb, planes);
 	Mat bMag;
 	magnitude(planes[0], planes[1], bMag);
 
+	// a = idft(G * Fc), multiplication here, not convolution
+	// G = Fb*Fb' / (Fb*Fb' + 1.0 / snr) / Fb
 	Mat tmp = bMag / (bMag + 1.0 / snr);
 	planes[0] = Mat_<float>(tmp);
 	planes[1] = Mat::zeros(tmp.size(), CV_32F);
@@ -161,9 +170,9 @@ void Wiener::deconv(const Mat &c, const Mat &b, float snr, Mat & a)
 	complexMatDiv(Fc, Fb, x);
 	idft(x, a, DFT_SCALE); */
 
-	//printMat(a);
+	// real part of necessary size
 	split(a, planes);
-	a = planes[0](Range(0, outRows), Range(0, outCols)); // real part of necessary size
+	a = planes[0](Range(0, outRows), Range(0, outCols)); 
 }
 
 Size Wiener::adjsize(const Size & N0, const Size & K)
