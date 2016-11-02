@@ -1,7 +1,7 @@
 import sys
 import numpy as np
-from scipy.misc import imread
 import os
+from scipy.misc import imread
 from PIL import Image
 
 def generate_samples(img, psf):
@@ -52,6 +52,13 @@ if __name__ == "__main__":
 
             img = imread(img_path, flatten=True)
             psf = np.ones((k, k)) / k**2
+
+            print "Original shape:", img.shape
+            if img.shape[0] % k != 1:
+                img = img[:-((img.shape[0] % k) - 1),:]
+            if img.shape[1] % k != 1:
+                img = img[:,:-((img.shape[1] % k) - 1)]
+            print "Shape used for sampling:", img.shape
 
             samples = generate_samples(img, psf)
 
