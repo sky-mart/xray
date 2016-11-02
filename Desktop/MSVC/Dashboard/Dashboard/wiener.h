@@ -27,11 +27,11 @@ private:
 	Mat psf;
 	Mat rest;
 
-	int curX;
-	int curY;
+	int anchorX;
+	int anchorY;
 
-	int curHorShift;
-	int curVerShift;
+	int shiftX;
+	int shiftY;
 
 	void setPsfSize(int psfSize);
 	void readSamples(const QString &path, const QString &baseName);

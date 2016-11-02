@@ -93,8 +93,8 @@ void MainWindow::handleDirectoryChanged(const QString &path)
 	if (fresh.length() == 1) {
 		// assume 1 image at a time for simplicity
 		QString pic = fresh.back();
-		QString picPath = picsDirPath + "\\" + pic;
-		Mat mat = imread(picPath.toStdString());
+        QString picPath = picsDirPath + QDir::separator() + pic;
+        Mat mat = imread(picPath.toStdString(), CV_LOAD_IMAGE_GRAYSCALE);
 		wiener->addCurSample(mat);
 		handleAutoButton();
 		pics << pic;
@@ -114,15 +114,15 @@ QStringList MainWindow::freshPics(const QString &path)
 
 void MainWindow::handleAutoButton()
 {
-	//    QPair<int, int> cur = wiener->curShift();
-	//    if (cur.first == 0 && cur.second == 0) {
-	//        qDebug() << "finished" << endl;
-	//        return;
-	//    }
-	//    qDebug() << "shift " << cur.first << ' ' << cur.second << endl;
-	//    shift(cur.first, cur.second);
-	//    snapshot();
-	wiener->process();
+	QPair<int, int> cur = wiener->curShift();
+	if (cur.first == 0 && cur.second == 0) {
+	    qDebug() << "finished" << endl;
+	    return;
+	}
+	qDebug() << "shift " << cur.first << ' ' << cur.second << endl;
+	shift(cur.first, cur.second);
+	snapshot();
+	//wiener->process();
 
 }
 

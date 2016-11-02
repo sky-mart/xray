@@ -12,11 +12,13 @@ Wiener::Wiener(int psfSize, QObject *parent) : QObject(parent)
 {
 	setPsfSize(psfSize);
 
-	curX = 0;
-	curY = 0;
+    // absolute coordinates on padded image
+	anchorX = 0;
+	anchorY = 0;
 
-	curHorShift = curX - (psfSize - 1) / 2;
-	curVerShift = curY - (psfSize - 1) / 2;
+    // relative to previous step shift
+    shiftX = anchorX - (psfSize - 1);
+	shiftY = anchorY - (psfSize - 1);
 }
 
 void Wiener::setPsfSize(int psfSize)
@@ -35,42 +37,42 @@ int Wiener::getPsfSize()
 
 QPair<int, int> Wiener::curShift()
 {
-	return QPair<int, int>(curHorShift, curVerShift);
+	return QPair<int, int>(shiftX, shiftY);
 }
 
 void Wiener::addCurSample(const Mat & sample)
 {
-	qDebug() << "added sample (" << curX << ", " << curY << ")" << endl;
-	samples[curX][curY] = sample;
+	qDebug() << "added sample (" << anchorY << ", " << anchorX << ")" << endl;
+    sample.convertTo(samples[anchorY][anchorX], CV_32F);
 
-	curX++;
-	if (curX == psfSize) {
-		curX = 0;
-		curHorShift = -(psfSize - 1);
+    anchorX++;
+    if (anchorX == psfSize) {
+        anchorX = 0;
+		shiftX = -(psfSize - 1);
 
-		if (curY == psfSize - 1) {
+		if (anchorY == psfSize - 1) {
 			// finish
-			curHorShift = 0;
-			curVerShift = 0;
+			shiftX = 0;
+			shiftY = 0;
 
 			process();
 		}
 		else {
-			curY++;
-			curVerShift = 1;
+			anchorY++;
+			shiftY = 1;
 		}
 	}
 	else {
-		curHorShift = 1;
-		curVerShift = 0;
+		shiftX = 1;
+		shiftY = 0;
 	}
 }
 
 void Wiener::process()
 {
-	readSamples(tr("D:\\Vlad\\Projects\\xray\\images"), tr("peka"));
+	//readSamples(tr("D:\\Vlad\\Projects\\xray\\images"), tr("peka"));
 	convFromSamples();
-	imwrite("D:\\Vlad\\Projects\\xray\\images\\conv_peka.png", conv);
+	//imwrite("D:\\Vlad\\Projects\\xray\\images\\conv_peka.png", conv);
 	Mat rest;
 	Mat psf = Mat::ones(psfSize, psfSize, CV_32F) / (psfSize*psfSize);
 
@@ -203,7 +205,8 @@ void Wiener::printMat(const Mat & M)
 		for (int j = 0; j < M.cols; j++) {
 			if (M.channels() == 1) {
 				dbg << M.at<float>(i, j) << ' ';
-			} else if (M.channels() == 2) {
+			} 
+            else if (M.channels() == 2) {
 				Vec2f el = M.at<Vec2f>(i, j);
 				dbg << el[0] << "+" << el[1] << 'i';
 			}	
