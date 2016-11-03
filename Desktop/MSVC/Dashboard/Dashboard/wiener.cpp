@@ -10,15 +10,11 @@ using namespace cv;
 
 Wiener::Wiener(int psfSize, QObject *parent) : QObject(parent)
 {
-	setPsfSize(psfSize);
-
-    // absolute coordinates on padded image
+	// absolute coordinates on padded image
 	anchorX = 0;
 	anchorY = 0;
 
-    // relative to previous step shift
-    shiftX = anchorX - (psfSize - 1);
-	shiftY = anchorY - (psfSize - 1);
+	setPsfSize(psfSize);
 }
 
 void Wiener::setPsfSize(int psfSize)
@@ -28,6 +24,10 @@ void Wiener::setPsfSize(int psfSize)
 	for (int i = 0; i < psfSize; i++) {
 		samples[i] = QVector<Mat>(psfSize);
 	}
+
+	// relative to previous step shift
+	shiftX = anchorX - (psfSize - 1);
+	shiftY = anchorY - (psfSize - 1);
 }
 
 int Wiener::getPsfSize()
@@ -54,8 +54,6 @@ void Wiener::addCurSample(const Mat & sample)
 			// finish
 			shiftX = 0;
 			shiftY = 0;
-
-			process();
 		}
 		else {
 			anchorY++;
@@ -75,13 +73,12 @@ void Wiener::process(bool test)
 	}
 	
 	convFromSamples();
-	imwrite((testDirPath + QDir::separator() + "conv_" + testName + ".png").toStdString(), conv);
+	//imwrite((testDirPath + QDir::separator() + "conv_" + testName + ".png").toStdString(), conv);
 	Mat rest;
 	Mat psf = Mat::ones(psfSize, psfSize, CV_64F) / (psfSize*psfSize);
 
-	double sigma = 0.01;
 	Mat withoutBorders = conv(Range(psfSize, conv.rows - psfSize), Range(psfSize, conv.cols - psfSize));
-	double snr = mean(withoutBorders)[0] / sigma;
+	double snr = mean(withoutBorders)[0] / noise_std;
 
 	deconv(conv, psf, snr, rest);
 	imwrite((testDirPath + QDir::separator() + "rest_" + testName + ".png").toStdString(), rest);
@@ -280,4 +277,9 @@ void Wiener::setTestName(const QString & name)
 const QString &  Wiener::getTestName() const
 {
 	return testName;
+}
+
+void Wiener::setNoiseStd(double noise_std)
+{
+	this->noise_std = noise_std;
 }

@@ -1,6 +1,7 @@
 import sys
 import numpy as np
 import os
+import time
 from scipy.misc import imread
 from PIL import Image
 
@@ -44,24 +45,26 @@ def save_24bit(name, img_f32):
     img = img.convert(mode="RGB")
     img.save(name)
     
-def save_samples(samples, dirpath, base_name, extension=".png"):
+def save_samples(samples, dirpath, base_name, delay, extension=".png"):
     for ay in xrange(samples.shape[0]):
         for ax in xrange(samples.shape[1]):
             name = os.path.join(dirpath, base_name + ("_ay=%d_ax=%d" % (ay, ax)) + extension) 
             save_24bit(name, samples[ay, ax])
+            time.sleep(delay) # for correct dates
 
 def usage():
     print "Usage:"
     print sys.argv[0] , "image", "psf_size", "noise_std"
 
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
+    if len(sys.argv) < 4:
         usage()
     else:
         try:
             img_path = sys.argv[1]
             k = int(sys.argv[2])
             noise_std = float(sys.argv[3])
+            delay = float(sys.argv[4]) if len(sys.argv) > 4 else 3.0
 
             img = imread(img_path, flatten=True)
             psf = np.ones((k, k)) / k**2
@@ -82,7 +85,7 @@ if __name__ == "__main__":
             base_name = base_name_with_ext[:dot_index]
             extension = base_name_with_ext[dot_index:]
 
-            save_samples(samples, dirpath, base_name, extension)
+            save_samples(samples, dirpath, base_name, delay, extension)
             print "Successfully generated samples"
         except Exception as e:
             print e

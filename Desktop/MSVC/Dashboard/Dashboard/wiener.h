@@ -19,6 +19,10 @@ public:
 	void setTestName(const QString & name);
 
 	int getPsfSize();
+	void setPsfSize(int psfSize);
+
+	void setNoiseStd(double noise_std);
+
 	QPair<int, int> curShift();
 	void addCurSample(const Mat & sample);
 
@@ -31,6 +35,7 @@ private:
 	Mat conv;
 	Mat psf;
 	Mat rest;
+	double noise_std;
 
 	int anchorX;
 	int anchorY;
@@ -41,7 +46,7 @@ private:
 	QString testDirPath;
 	QString testName;
 
-	void setPsfSize(int psfSize);
+	
 	void readSamples(const QString &path, const QString &baseName);
 	void convFromSamples();
 	void deconv(const Mat & c, const Mat & b, double snr, Mat &a);

@@ -72,6 +72,11 @@ void MainWindow::readSettings()
 	wiener->setTestDirPath(testDirPath);
 	wiener->setTestName(testBaseName);
 
+	int psfSize = settings->value("psf-size").toInt();
+	double noise_std = settings->value("noise-std").toDouble();
+	wiener->setPsfSize(psfSize);
+	wiener->setNoiseStd(noise_std);
+
 	delete settings;
 }
 
@@ -119,6 +124,9 @@ void MainWindow::handleDirectoryChanged(const QString &path)
 		// assume 1 image at a time for simplicity
 		QString pic = fresh.back();
         QString picPath = picsDirPath + QDir::separator() + pic;
+
+		ui->statusBar->showMessage("New image received: " + pic);
+
         Mat mat = imread(picPath.toStdString(), CV_LOAD_IMAGE_GRAYSCALE);
 		wiener->addCurSample(mat);
 		handleAutoButton();
@@ -142,11 +150,14 @@ void MainWindow::handleAutoButton()
 	QPair<int, int> cur = wiener->curShift();
 	if (cur.first == 0 && cur.second == 0) {
 	    qDebug() << "finished" << endl;
-	    return;
+		wiener->process();
+		ui->statusBar->showMessage("Image restored");
 	}
-	qDebug() << "shift(x,y) " << cur.first << ' ' << cur.second << endl;
-	shift(cur.first, cur.second);
-	snapshot();
+	else {
+		qDebug() << "shift(x,y) " << cur.first << ' ' << cur.second << endl;
+		shift(cur.first, cur.second);
+		snapshot();
+	}
 }
 
 void MainWindow::handleTestButton()
