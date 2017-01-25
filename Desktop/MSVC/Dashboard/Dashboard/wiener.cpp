@@ -1,4 +1,4 @@
-#include "wiener.h"
+﻿#include "wiener.h"
 #include <QPair>
 #include <QDebug>
 #include <QDir>
@@ -40,10 +40,19 @@ QPair<int, int> Wiener::curShift()
 	return QPair<int, int>(shiftX, shiftY);
 }
 
-void Wiener::addCurSample(const Mat & sample)
+/*
+(anchorX, anchorY) - якорек на оригинальном изображении, относительно которого мы делаем очередной снимок
+(shiftX, shiftY) - сдвиг, необходимый для следующего снимка
+*/
+void Wiener::addCurSample(const Mat & sample, bool firstPic)
 {
+	if (firstPic) {
+		conv = Mat(psfSize * sample.rows, psfSize * sample.cols, CV_64F);
+	}
 	qDebug() << "added sample (" << anchorY << ", " << anchorX << ")" << endl;
-    sample.convertTo(samples[anchorY][anchorX], CV_64F);
+	Mat convertedSample;
+	sample.convertTo(convertedSample, CV_64F);
+	convFromSample(convertedSample);
 
     anchorX++;
     if (anchorX == psfSize) {
@@ -70,9 +79,9 @@ void Wiener::process(bool test)
 {
 	if (test) {
 		readSamples(testDirPath, testName);
+		convFromSamples();
 	}
 	
-	convFromSamples();
 	//imwrite((testDirPath + QDir::separator() + "conv_" + testName + ".png").toStdString(), conv);
 	Mat rest;
 	Mat psf = Mat::ones(psfSize, psfSize, CV_64F) / (psfSize*psfSize);
@@ -121,6 +130,16 @@ void Wiener::convFromSamples()
 					int j = (x - anchor_x) / psfSize;
 					conv.at<double>(y, x) = samples[anchor_y][anchor_x].at<double>(i, j);
 				}
+}
+
+void Wiener::convFromSample(const Mat &sample)
+{
+	for (int y = anchorX; y < conv.rows; y += psfSize)
+		for (int x = anchorY; x < conv.cols; x += psfSize) {
+			int i = (y - anchorY) / psfSize;
+			int j = (x - anchorX) / psfSize;
+			conv.at<double>(y, x) = sample.at<double>(i, j);
+		}
 }
 
 void Wiener::deconv(const Mat &c, const Mat &b, double snr, Mat & a)

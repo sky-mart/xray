@@ -1,11 +1,13 @@
-#include "mainwindow.h"
+﻿#include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include <QtSerialPort/qserialport.h>
 #include <QDebug>
 #include <QFileSystemWatcher>
 #include <QDir>
 #include <QSettings>
+#include <QTimer>
 #include <qfiledialog.h>
+#include <qmessagebox.h>
 
 #include "opencv2/core/core.hpp"
 #include "opencv2/highgui/highgui.hpp"
@@ -23,6 +25,7 @@ ui(new Ui::MainWindow)
 	ui->setupUi(this);
 	connect(ui->shiftButton, SIGNAL(pressed()), SLOT(handleShiftButton()));
 	connect(ui->snapshotButton, SIGNAL(pressed()), SLOT(handleSnapshotButton()));
+	connect(ui->manualButton, SIGNAL(pressed()), SLOT(handleManualButton()));
 	connect(ui->autoButton, SIGNAL(pressed()), SLOT(handleAutoButton()));
 	connect(ui->testButton, SIGNAL(pressed()), SLOT(handleTestButton()));
 	connect(ui->testDirButton, SIGNAL(pressed()), SLOT(handleTestDirButton()));
@@ -36,12 +39,16 @@ ui(new Ui::MainWindow)
 
 	watcher = new QFileSystemWatcher();
 	watcher->addPath(picsDirPath);
-	connect(watcher, SIGNAL(directoryChanged(const QString &)), SLOT(handleDirectoryChanged(const QString &)));
+	//connect(watcher, SIGNAL(directoryChanged(const QString &)), SLOT(handleDirectoryChanged(const QString &)));
+	timer = new QTimer(this);
+	timer->setInterval(10000);
+	timer->setSingleShot(true);
+	connect(timer, SIGNAL(timeout()), SLOT(resnap()));
 
 	serial = NULL;
 	connectToDevice();
 
-	
+	firstPic = true;
 }
 
 MainWindow::~MainWindow()
@@ -54,6 +61,7 @@ MainWindow::~MainWindow()
 	delete watcher;
 	delete wiener;
 	delete ui;
+	delete timer;
 }
 
 void MainWindow::readSettings()
@@ -124,13 +132,42 @@ void MainWindow::handleDirectoryChanged(const QString &path)
 		// assume 1 image at a time for simplicity
 		QString pic = fresh.back();
         QString picPath = picsDirPath + QDir::separator() + pic;
+		pics << pic;
 
 		ui->statusBar->showMessage("New image received: " + pic);
-
         Mat mat = imread(picPath.toStdString(), CV_LOAD_IMAGE_GRAYSCALE);
-		wiener->addCurSample(mat);
-		handleAutoButton();
-		pics << pic;
+		timer->stop();
+
+		if (firstPic) {
+			QMessageBox mb(QMessageBox::Question,
+				tr("First Picture"),
+				tr("Is the first picture OK?"),
+				QMessageBox::Yes | QMessageBox::No,
+				this
+			);
+			if (mb.exec() == QMessageBox::Yes) {
+				qDebug() << "Leave like this";
+				firstPic = false;
+				wiener->addCurSample(mat, true);
+				handleAutoButton();
+				firstAveragePixel = mean(mat)[0];
+			}
+			else {
+				qDebug() << "Don not leave like this";
+				resnap(true);
+			}
+		}
+		else {
+			double averagePixel = mean(mat)[0];
+			if (abs(averagePixel - firstAveragePixel) / firstAveragePixel < 0.1) {
+				wiener->addCurSample(mat);
+				handleAutoButton();
+			}
+			else {
+				resnap(true);
+			}
+			
+		}
 	}
 }
 
@@ -145,28 +182,77 @@ QStringList MainWindow::freshPics(const QString &path)
 	return freshOnly;
 }
 
+void MainWindow::handleManualButton()
+{
+	disconnect(/*SIGNAL(directoryChanged(const QString &)),*/ this, SLOT(handleDirectoryChanged(const QString &)));
+}
+
 void MainWindow::handleAutoButton()
 {
+	connect(watcher, SIGNAL(directoryChanged(const QString &)), SLOT(handleDirectoryChanged(const QString &)));
+
 	QPair<int, int> cur = wiener->curShift();
 	if (cur.first == 0 && cur.second == 0) {
 	    qDebug() << "finished" << endl;
 		wiener->process();
 		ui->statusBar->showMessage("Image restored");
+		disconnect(this, SLOT(handleDirectoryChanged(const QString &)));
 	}
 	else {
-		qDebug() << "shift(x,y) " << cur.first << ' ' << cur.second << endl;
-		shift(cur.first, cur.second);
-		snapshot();
+		/*Дополнительное движение против люфтов */
+		if (abs(cur.first) > 1) {
+			if (abs(cur.second) > 1) {
+				shift(2 * cur.first, 2 * cur.second);
+				shift(-cur.first, -cur.second);
+			}
+			else {
+				shift(2 * cur.first, cur.second);
+				shift(-cur.first, 0);
+			}
+		}
+		else {
+			if (abs(cur.second) > 1) {
+				shift(cur.first, 2 * cur.second);
+				shift(0, -cur.second);
+			}
+			else {
+				shift(cur.first, cur.second);
+			}
+		}
+
+		resnap(true);
 	}
+}
+
+void MainWindow::resnap(bool fromZero)
+{
+	if (fromZero) snapAttempts = 0;
+
+	timer->start();
+	snapAttempts++;
+
+	if (snapAttempts >= 5) {
+		ui->statusBar->showMessage("Can not take a picture!");
+		timer->stop();
+		return;
+	} 
+	snapshot();
+}
+
+void MainWindow::resnap()
+{
+	resnap(false);
 }
 
 void MainWindow::handleTestButton()
 {
+	connect(watcher, SIGNAL(directoryChanged(const QString &)), SLOT(handleDirectoryChanged(const QString &)));
 	wiener->process(true);
 }
 
 void MainWindow::shift(int hor, int ver)
 {
+	qDebug() << "shift(x,y) " << hor << ' ' << ver << endl;
 	serial->write(tr("s%1 %2")
 		.arg(QString::number(hor))
 		.arg(QString::number(ver))

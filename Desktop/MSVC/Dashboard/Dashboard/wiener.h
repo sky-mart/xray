@@ -24,7 +24,7 @@ public:
 	void setNoiseStd(double noise_std);
 
 	QPair<int, int> curShift();
-	void addCurSample(const Mat & sample);
+	void addCurSample(const Mat & sample, bool firstPic = false);
 
 	void process(bool test = false);
 	static int gcd(int a, int b);
@@ -49,6 +49,7 @@ private:
 	
 	void readSamples(const QString &path, const QString &baseName);
 	void convFromSamples();
+	void convFromSample(const Mat &sample);
 	void deconv(const Mat & c, const Mat & b, double snr, Mat &a);
 	Size adjsize(const Size & N, const Size & K);
 	void printMat(const Mat & M);

@@ -18,9 +18,10 @@ public:
 	explicit MainWindow(QWidget *parent = 0);
 	~MainWindow();
 
-	private Q_SLOTS:
+private Q_SLOTS:
 	void handleShiftButton();
 	void handleSnapshotButton();
+	void handleManualButton();
 	void handleAutoButton();
 	void handleTestButton();
 	void handleTestBaseNameButton();
@@ -28,9 +29,12 @@ public:
 
 	void handleDirectoryChanged(const QString &path);
 
+	void resnap();
+
 private:
 	void shift(int hor, int ver);
 	void snapshot();
+	void resnap(bool fromZero);
 
 	void readSettings();
 	void saveSettings();
@@ -40,6 +44,12 @@ private:
 	Ui::MainWindow *ui;
 	QSerialPort *serial;
 	QFileSystemWatcher *watcher;
+
+	bool firstPic;
+	int snapAttempts;
+	QTimer *timer;
+
+	double firstAveragePixel;
 
 	QStringList pics;
 	Wiener *wiener;
