@@ -160,6 +160,7 @@ void MainWindow::handleDirectoryChanged(const QString &path)
 		else {
 			double averagePixel = mean(mat)[0];
 			if (abs(averagePixel - firstAveragePixel) / firstAveragePixel < 0.1) {
+				mat *= (firstAveragePixel / averagePixel);
 				wiener->addCurSample(mat);
 				handleAutoButton();
 			}
